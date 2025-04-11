@@ -31,7 +31,7 @@ const theme = {
 const FamilyTreeGraph = () => {
   const [elements, setElements] = useState([]);
   const [connections, setConnections] = useState([]);
-
+//test
   useEffect(() => {
     fetch('https://cors-anywhere.herokuapp.com/http://gisservices.ge:8080/familytreewebapi/api/family', {
       headers: {
