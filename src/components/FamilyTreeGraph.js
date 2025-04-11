@@ -33,7 +33,7 @@ const FamilyTreeGraph = () => {
   const [connections, setConnections] = useState([]);
 
   useEffect(() => {
-    fetch('https://localhost:7261/api/family')
+    fetch('http://gisservices.ge:8080/familytreewebapi/api/family')
       .then(response => response.json())
       .then(data => {
         setElements(data.members.$values);
