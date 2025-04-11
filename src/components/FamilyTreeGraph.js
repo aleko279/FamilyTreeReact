@@ -31,23 +31,15 @@ const theme = {
 const FamilyTreeGraph = () => {
   const [elements, setElements] = useState([]);
   const [connections, setConnections] = useState([]);
-//test
+
   useEffect(() => {
-    fetch('https://cors-anywhere.herokuapp.com/http://gisservices.ge:8080/familytreewebapi/api/family', {
-      headers: {
-        'Origin': 'https://aleko279.github.io' // This is required by the proxy
-      }
-    })
+    fetch('http://aleko279.runasp.net/api/family')
       .then(response => response.json())
       .then(data => {
         setElements(data.members.$values);
         setConnections(data.relationships.$values);
-      })
-      .catch(error => {
-        console.error('Error fetching family data:', error);
       });
   }, []);
-  
 
   useEffect(() => {
     if (!elements.length || !connections.length) return;
