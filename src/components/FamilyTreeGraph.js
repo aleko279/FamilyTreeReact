@@ -33,13 +33,21 @@ const FamilyTreeGraph = () => {
   const [connections, setConnections] = useState([]);
 
   useEffect(() => {
-    fetch('http://gisservices.ge:8080/familytreewebapi/api/family')
+    fetch('https://cors-anywhere.herokuapp.com/http://gisservices.ge:8080/familytreewebapi/api/family', {
+      headers: {
+        'Origin': 'https://aleko279.github.io' // This is required by the proxy
+      }
+    })
       .then(response => response.json())
       .then(data => {
         setElements(data.members.$values);
         setConnections(data.relationships.$values);
+      })
+      .catch(error => {
+        console.error('Error fetching family data:', error);
       });
   }, []);
+  
 
   useEffect(() => {
     if (!elements.length || !connections.length) return;
