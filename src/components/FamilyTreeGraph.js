@@ -1,39 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import cytoscape from "cytoscape";
-import dagre from "cytoscape-dagre";
-import elk from "cytoscape-elk";
-import cola from "cytoscape-cola";
-import avsdf from "cytoscape-avsdf";
-import cise from "cytoscape-cise";
-import coseBilkent from "cytoscape-cose-bilkent";
-import fcose from "cytoscape-fcose";
+import cytoscape from 'cytoscape';
+import dagre from 'cytoscape-dagre';
 
 cytoscape.use(dagre);
-cytoscape.use(elk);
-cytoscape.use(cola);
-cytoscape.use(avsdf);
-cytoscape.use(cise);
-cytoscape.use(coseBilkent);
-cytoscape.use(fcose);
-
-const theme = {
-  euiColorMediumShade: "#999",
-  avatarSizing: {
-    l: {
-      size: 16
-    }
-  },
-  paddingSizes: {
-    xs: 4
-  }
-};
 
 const FamilyTreeGraph = () => {
   const [elements, setElements] = useState([]);
   const [connections, setConnections] = useState([]);
 
   useEffect(() => {
-    fetch('https://aleko279.runasp.net/api/family')
+    fetch('https://localhost:7261/api/family')
       .then(response => response.json())
       .then(data => {
         setElements(data.members.$values);
@@ -46,6 +22,8 @@ const FamilyTreeGraph = () => {
 
     const mergePointToParents = {};
     const mergePointToChildren = {};
+    const pairColors = ["#f94144", "#277da1", "#f3722c", "#43aa8b", "#9e2a2b", "#4d908e"];
+    const childColor = "#8ac926";
 
     connections.forEach(conn => {
       const target = elements.find(el => el.id === conn.target);
@@ -62,8 +40,6 @@ const FamilyTreeGraph = () => {
 
     const parentColorMap = {};
     const childColorMap = {};
-    const pairColors = ["#f94144", "#277da1", "#f3722c", "#43aa8b", "#9e2a2b", "#4d908e"];
-    const childColor = "#8ac926";
     let colorIndex = 0;
 
     Object.entries(mergePointToParents).forEach(([mergeId, parentIds]) => {
@@ -82,44 +58,37 @@ const FamilyTreeGraph = () => {
       container: document.getElementById("cy"),
       boxSelectionEnabled: false,
       autounselectify: false,
-      selectionType: 'single',
       layout: {
         name: "dagre",
         nodeDimensionsIncludeLabels: true,
-        animate: false,
+        animate: true,
         directed: true
       },
       style: [
         {
-          selector: 'node[role = "MergePoint"]',
+          selector: "node",
           style: {
-            width: 1,
-            height: 1,
-            opacity: 0,
-            "background-opacity": 0,
-            "border-width": 0,
-            label: ""
+            "background-color": "#666",
+            "label": "data(fname)",
+            "text-valign": "center",
+            "text-halign": "center",
+            "color": "#fff",
+            "font-size": 10,
+            "shape": "round-rectangle",
+            "width": 80,
+            "height": 30,
+            "text-wrap": "wrap",
+            "text-max-width": 70,
+            "border-width": 2,
+            "border-color": "#999"
           }
         },
         {
-          selector: "node",
+          selector: "node.selected",
           style: {
-            "background-color": "#999",
-            "border-color": "#ddd",
-            "border-width": 1,
-            color: "#000",
-            "font-family": "Inter UI, Segoe UI, Helvetica, Arial, sans-serif",
-            "font-size": 8,
-            height: theme.avatarSizing.l.size + 10,
-            width: 60,
-            label: "data(name)",
-            "min-zoomed-font-size": 8,
-            "overlay-opacity": 0,
-            shape: "rectangle",
-            "text-valign": "center",
-            "text-halign": "center",
-            "text-wrap": "wrap",
-            "text-max-width": 60
+            "border-color": "#FFD700",
+            "border-width": 4,
+            "background-color": "#444"
           }
         },
         {
@@ -127,21 +96,18 @@ const FamilyTreeGraph = () => {
           style: {
             "curve-style": "taxi",
             "taxi-direction": "downward",
-            "line-color": theme.euiColorMediumShade,
-            "overlay-opacity": 0,
-            "target-arrow-color": theme.euiColorMediumShade,
             "target-arrow-shape": "triangle",
-            "target-distance-from-node": theme.paddingSizes.xs,
-            width: 0.5,
-            "source-arrow-shape": "none"
+            "line-color": "#ccc",
+            "target-arrow-color": "#ccc",
+            "width": 2
           }
         },
         {
-          selector: "edge:selected",
+          selector: "edge.selected",
           style: {
-            "line-color": "#ff0000",
-            "target-arrow-color": "#ff0000",
-            width: 2
+            "line-color": "red",
+            "target-arrow-color": "red",
+            "width": 4
           }
         },
         ...pairColors.map((color, i) => ({
@@ -155,6 +121,17 @@ const FamilyTreeGraph = () => {
           style: {
             "background-color": childColor
           }
+        },
+        {
+          selector: 'node[role = "MergePoint"]',
+          style: {
+            width: 1,
+            height: 1,
+            opacity: 0,
+            "background-opacity": 0,
+            "border-width": 0,
+            label: ""
+          }
         }
       ],
       elements: [
@@ -162,10 +139,11 @@ const FamilyTreeGraph = () => {
           let className = "";
           if (parentColorMap[el.id]) className = parentColorMap[el.id];
           else if (childColorMap[el.id]) className = "child-color";
+
           return {
             data: {
               id: el.id,
-              name: el.name,
+              fname: el.lname ? `${el.fname}\n${el.lname}` : el.fname,
               role: el.role
             },
             classes: className
@@ -180,83 +158,84 @@ const FamilyTreeGraph = () => {
       ]
     });
 
-    const redirectEdges = () => {
-      cy.edges().forEach(edge => {
-        const sourceNode = edge.source();
-        const targetNode = edge.target();
+    // --- Custom Logic to Find Clean Path Between Nodes ---
+    let selectedNodes = [];
 
-        if (sourceNode.data('role') === 'MergePoint') {
-          const prev = sourceNode.incomers('[role!="MergePoint"]')[0];
-          if (prev) edge.data('source', prev.id());
-        }
+    const findPathToRoot = (cy, nodeId) => {
+      const path = [];
+      let currentNode = cy.getElementById(nodeId);
 
-        if (targetNode.data('role') === 'MergePoint') {
-          const next = targetNode.outgoers('[role!="MergePoint"]')[0];
-          if (next) edge.data('target', next.id());
-        }
-      });
+      while (true) {
+        const incoming = currentNode.incomers('edge');
+        if (incoming.length === 0) break;
+        const edge = incoming[0]; // only follow one parent path
+        path.push(edge);
+        currentNode = edge.source();
+      }
 
-      cy.layout({
-        name: 'dagre',
-        nodeDimensionsIncludeLabels: true,
-        animate: true,
-        directed: true
-      }).run();
+      return path;
     };
 
-    redirectEdges();
+    const findCommonAncestor = (path1, path2) => {
+      const set1 = new Set(path1.map(e => e.source().id()));
+      for (let e of path2) {
+        const id = e.source().id();
+        if (set1.has(id)) return id;
+      }
+      return null;
+    };
 
-    cy.on('add', 'node', redirectEdges);
-    cy.on('remove', 'node', redirectEdges);
+    const trimToAncestor = (path, ancestorId) => {
+      const trimmed = [];
+      for (let e of path) {
+        trimmed.push(e);
+        if (e.source().id() === ancestorId) break;
+      }
+      return trimmed;
+    };
 
-    cy.on('select', 'edge', (event) => {
-      console.log("Selected edge:", event.target.data());
+    const highlightDirectLineage = (cy, id1, id2) => {
+      const path1 = findPathToRoot(cy, id1);
+      const path2 = findPathToRoot(cy, id2);
+
+      const ancestor = findCommonAncestor(path1, path2);
+      if (!ancestor) return;
+
+      const path1Trimmed = trimToAncestor(path1, ancestor);
+      const path2Trimmed = trimToAncestor(path2, ancestor);
+
+      [...path1Trimmed, ...path2Trimmed].forEach(edge => edge.addClass('selected'));
+    };
+
+    cy.on('tap', 'node', (event) => {
+      const node = event.target;
+      const nodeId = node.id();
+
+      if (selectedNodes.length === 2 || selectedNodes.includes(nodeId)) {
+        cy.nodes().removeClass('selected');
+        cy.edges().removeClass('selected');
+        selectedNodes = [];
+      }
+
+      if (!selectedNodes.includes(nodeId)) {
+        selectedNodes.push(nodeId);
+        node.addClass('selected');
+      }
+
+      if (selectedNodes.length === 2) {
+        const [startId, endId] = selectedNodes;
+        highlightDirectLineage(cy, startId, endId);
+      }
     });
-
-    // Highlight path from grandparent to grandchild
-    function highlightPath(startId, endId) {
-      cy.edges().unselect(); // Clear any previous selection
-      const visited = new Set();
-      const pathEdges = [];
-
-      function dfs(currentId) {
-        if (currentId === endId) return true;
-        visited.add(currentId);
-
-        const outgoingEdges = cy.edges().filter(e => e.source().id() === currentId);
-        for (let edge of outgoingEdges) {
-          const targetId = edge.target().id();
-          if (!visited.has(targetId)) {
-            if (dfs(targetId)) {
-              pathEdges.push(edge);
-              return true;
-            }
-          }
-        }
-        return false;
-      }
-
-      if (dfs(startId)) {
-        pathEdges.forEach(edge => edge.select());
-      }
-    }
-
-    // Example: Replace with actual IDs from your dataset
-    setTimeout(() => {
-      highlightPath("grandparentId", "grandchildId");
-    }, 1000);
 
     return () => cy.destroy();
   }, [elements, connections]);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      <div style={{ padding: "10px", background: "#282c34", color: "white" }}>
-        <h3>გენეალოგიური ხე</h3>
-      </div>
-      <div id="cy" style={{ flexGrow: 1 }}></div>
+    <div style={{ height: "100vh", width: "100%" }}>
+      <div id="cy" style={{ height: "100%", width: "100%" }}></div>
     </div>
   );
-}
+};
 
-export default FamilyTreeGraph ;
+export default FamilyTreeGraph;
