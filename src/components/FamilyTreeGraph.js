@@ -22,17 +22,17 @@ const FamilyTreeGraph = () => {
 
     const mergePointToParents = {};
     const mergePointToChildren = {};
-    const pairColors = ["#f94144", "#277da1", "#f3722c", "#43aa8b", "#9e2a2b", "#4d908e"];
-    const childColor = "#8ac926";
+    const pairColors = ['#f94144', '#277da1', '#f3722c', '#43aa8b', '#9e2a2b', '#4d908e'];
+    const childColor = '#8ac926';
 
     connections.forEach(conn => {
       const target = elements.find(el => el.id === conn.target);
       const source = elements.find(el => el.id === conn.source);
-      if (target?.role === "MergePoint") {
+      if (target?.role === 'MergePoint') {
         if (!mergePointToParents[conn.target]) mergePointToParents[conn.target] = [];
         mergePointToParents[conn.target].push(conn.source);
       }
-      if (source?.role === "MergePoint") {
+      if (source?.role === 'MergePoint') {
         if (!mergePointToChildren[conn.source]) mergePointToChildren[conn.source] = [];
         mergePointToChildren[conn.source].push(conn.target);
       }
@@ -49,78 +49,78 @@ const FamilyTreeGraph = () => {
       });
       const children = mergePointToChildren[mergeId] || [];
       children.forEach(cid => {
-        childColorMap[cid] = "child-color";
+        childColorMap[cid] = 'child-color';
       });
       colorIndex++;
     });
 
     const cy = cytoscape({
-      container: document.getElementById("cy"),
+      container: document.getElementById('cy'),
       boxSelectionEnabled: false,
       autounselectify: false,
       layout: {
-        name: "dagre",
+        name: 'dagre',
         nodeDimensionsIncludeLabels: true,
         animate: true,
-        directed: true
+        directed: true,
       },
       style: [
         {
-          selector: "node",
+          selector: 'node',
           style: {
-            "background-color": "#666",
-            "label": "data(fname)",
-            "text-valign": "center",
-            "text-halign": "center",
-            "color": "#fff",
-            "font-size": 10,
-            "shape": "round-rectangle",
-            "width": 80,
-            "height": 30,
-            "text-wrap": "wrap",
-            "text-max-width": 70,
-            "border-width": 2,
-            "border-color": "#999"
-          }
+            'background-color': '#666',
+            label: 'data(fname)',
+            'text-valign': 'center',
+            'text-halign': 'center',
+            color: '#fff',
+            'font-size': 10,
+            shape: 'round-rectangle',
+            width: 80,
+            height: 30,
+            'text-wrap': 'wrap',
+            'text-max-width': 70,
+            'border-width': 2,
+            'border-color': '#999',
+          },
         },
         {
-          selector: "node.selected",
+          selector: 'node.selected',
           style: {
-            "border-color": "#FFD700",
-            "border-width": 4,
-            "background-color": "#444"
-          }
+            'border-color': '#FFD700',
+            'border-width': 4,
+            'background-color': '#444',
+          },
         },
         {
-          selector: "edge",
+          selector: 'edge',
           style: {
-            "curve-style": "taxi",
-            "taxi-direction": "downward",
-            "target-arrow-shape": "triangle",
-            "line-color": "#ccc",
-            "target-arrow-color": "#ccc",
-            "width": 2
-          }
+            'curve-style': 'taxi',
+            'taxi-direction': 'downward',
+            'target-arrow-shape': 'triangle',
+            'line-color': '#ccc',
+            'target-arrow-color': '#ccc',
+            width: 2,
+          },
         },
         {
-          selector: "edge.selected",
+          selector: 'edge.selected',
           style: {
-            "line-color": "red",
-            "target-arrow-color": "red",
-            "width": 4
-          }
+            'line-color': 'red',
+            'target-arrow-color': 'red',
+            width: 4,
+          },
         },
         ...pairColors.map((color, i) => ({
           selector: `.pair-color-${i}`,
           style: {
-            "background-color": color
-          }
+            'background-color': color,
+          },
         })),
         {
           selector: '.child-color',
           style: {
-            "background-color": childColor
-          }
+            'background-color': childColor,
+          },
         },
         {
           selector: 'node[role = "MergePoint"]',
@@ -128,83 +128,113 @@ const FamilyTreeGraph = () => {
             width: 1,
             height: 1,
             opacity: 0,
-            "background-opacity": 0,
-            "border-width": 0,
-            label: ""
-          }
-        }
+            'background-opacity': 0,
+            'border-width': 0,
+            label: '',
+          },
+        },
       ],
       elements: [
         ...elements.map(el => {
-          let className = "";
+          let className = '';
           if (parentColorMap[el.id]) className = parentColorMap[el.id];
-          else if (childColorMap[el.id]) className = "child-color";
+          else if (childColorMap[el.id]) className = 'child-color';
 
           return {
             data: {
               id: el.id,
               fname: el.lname ? `${el.fname}\n${el.lname}` : el.fname,
-              role: el.role
+              role: el.role,
             },
-            classes: className
+            classes: className,
           };
         }),
         ...connections.map(conn => ({
           data: {
             source: conn.source,
-            target: conn.target
-          }
-        }))
-      ]
+            target: conn.target,
+          },
+        })),
+      ],
     });
 
-    // --- Custom Logic to Find Clean Path Between Nodes ---
+    // === Path Selection Logic ===
     let selectedNodes = [];
 
     const findPathToRoot = (cy, nodeId) => {
       const path = [];
-      let currentNode = cy.getElementById(nodeId);
+      let current = cy.getElementById(nodeId);
 
-      while (true) {
-        const incoming = currentNode.incomers('edge');
-        if (incoming.length === 0) break;
-        const edge = incoming[0]; // only follow one parent path
-        path.push(edge);
-        currentNode = edge.source();
+      while (current.incomers('edge').length > 0) {
+        const incoming = current.incomers('edge')[0];
+        path.push(incoming);
+        current = incoming.source();
       }
 
       return path;
     };
 
     const findCommonAncestor = (path1, path2) => {
-      const set1 = new Set(path1.map(e => e.source().id()));
-      for (let e of path2) {
-        const id = e.source().id();
-        if (set1.has(id)) return id;
+      const set1 = new Set(path1.map(edge => edge.source().id()));
+      for (let edge of path2) {
+        if (set1.has(edge.source().id())) return edge.source().id();
       }
       return null;
     };
 
     const trimToAncestor = (path, ancestorId) => {
       const trimmed = [];
-      for (let e of path) {
-        trimmed.push(e);
-        if (e.source().id() === ancestorId) break;
+      for (let edge of path) {
+        trimmed.push(edge);
+        if (edge.source().id() === ancestorId) break;
       }
       return trimmed;
+    };
+
+    const findDirectLineage = (cy, fromId, toId) => {
+      const visited = new Set();
+      const path = [];
+
+      const dfs = (currentId) => {
+        if (currentId === toId) return true;
+        visited.add(currentId);
+
+        const outEdges = cy.getElementById(currentId).outgoers('edge');
+
+        for (let edge of outEdges) {
+          const nextId = edge.target().id();
+          if (!visited.has(nextId)) {
+            path.push(edge);
+            if (dfs(nextId)) return true;
+            path.pop();
+          }
+        }
+
+        return false;
+      };
+
+      if (dfs(fromId)) return [...path];
+      return [];
     };
 
     const highlightDirectLineage = (cy, id1, id2) => {
       const path1 = findPathToRoot(cy, id1);
       const path2 = findPathToRoot(cy, id2);
-
       const ancestor = findCommonAncestor(path1, path2);
-      if (!ancestor) return;
 
-      const path1Trimmed = trimToAncestor(path1, ancestor);
-      const path2Trimmed = trimToAncestor(path2, ancestor);
-
-      [...path1Trimmed, ...path2Trimmed].forEach(edge => edge.addClass('selected'));
+      if (ancestor) {
+        const trimmed1 = trimToAncestor(path1, ancestor);
+        const trimmed2 = trimToAncestor(path2, ancestor);
+        [...trimmed1, ...trimmed2].forEach(edge => edge.addClass('selected'));
+      } else {
+        const direct = findDirectLineage(cy, id1, id2);
+        if (direct.length > 0) {
+          direct.forEach(edge => edge.addClass('selected'));
+        } else {
+          const reverse = findDirectLineage(cy, id2, id1);
+          reverse.forEach(edge => edge.addClass('selected'));
+        }
+      }
     };
 
     cy.on('tap', 'node', (event) => {
@@ -223,8 +253,8 @@ const FamilyTreeGraph = () => {
       }
 
       if (selectedNodes.length === 2) {
-        const [startId, endId] = selectedNodes;
-        highlightDirectLineage(cy, startId, endId);
+        const [id1, id2] = selectedNodes;
+        highlightDirectLineage(cy, id1, id2);
       }
     });
 
@@ -232,8 +262,8 @@ const FamilyTreeGraph = () => {
   }, [elements, connections]);
 
   return (
-    <div style={{ height: "100vh", width: "100%" }}>
-      <div id="cy" style={{ height: "100%", width: "100%" }}></div>
+    <div style={{ height: '100vh', width: '100%' }}>
+      <div id="cy" style={{ height: '100%', width: '100%' }}></div>
     </div>
   );
 };
