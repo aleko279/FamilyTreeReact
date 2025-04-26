@@ -9,7 +9,8 @@ const FamilyTreeGraph = () => {
   const [connections, setConnections] = useState([]);
 
   useEffect(() => {
-    fetch('https://localhost:7261/api/family')
+    //fetch('https://localhost:7261/api/family')
+    fetch('https://aleko279.runasp.net/api/family')
       .then(response => response.json())
       .then(data => {
         setElements(data.members.$values);
