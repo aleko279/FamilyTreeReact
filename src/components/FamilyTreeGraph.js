@@ -7,18 +7,28 @@ cytoscape.use(dagre);
 const FamilyTreeGraph = () => {
   const [elements, setElements] = useState([]);
   const [connections, setConnections] = useState([]);
-
+  const [cyInstance, setCyInstance] = useState(null);
+  const [selectedLname, setSelectedLname] = useState('');
+  const [allLnames, setAllLnames] = useState([]);
+  const [filteredCount, setFilteredCount] = useState(0);
   useEffect(() => {
-    //fetch('https://localhost:7261/api/family')
-    fetch('https://aleko279.runasp.net/api/family')
+    //fetch('https://localhost:7261/api/FamilyTree')
+    fetch('https://aleko279.runasp.net/api/familytree')
       .then(response => response.json())
       .then(data => {
-        setElements(data.members.$values);
-        setConnections(data.relationships.$values);
+        setElements(data.members);
+        setConnections(data.relationships);
+        const uniqueLnames = [...new Set(data.members.map(m => m.lname).filter(Boolean))];
+        setAllLnames(uniqueLnames);
       });
   }, []);
-
   useEffect(() => {
+    // თავიდანვე აჩვენე სრული რაოდენობა mergePoint-ების გარეშე
+    const initial = elements.filter(m => !m.mergePoint).length;
+    setFilteredCount(initial);
+  }, [elements]);
+  useEffect(() => {
+    if (!connections || !elements) return;
     if (!elements.length || !connections.length) return;
 
     const mergePointToParents = {};
@@ -146,6 +156,7 @@ const FamilyTreeGraph = () => {
               id: el.id,
               fname: el.lname ? `${el.fname}\n${el.lname}` : el.fname,
               role: el.role,
+              lname: el.lname,
             },
             classes: className,
           };
@@ -158,6 +169,8 @@ const FamilyTreeGraph = () => {
         })),
       ],
     });
+
+    setCyInstance(cy);
 
     // === Path Selection Logic ===
     let selectedNodes = [];
@@ -262,10 +275,130 @@ const FamilyTreeGraph = () => {
     return () => cy.destroy();
   }, [elements, connections]);
 
+  const handleLnameFilter = (lname) => {
+
+    const filtered = lname
+      ? elements.filter(m => m.lname === lname)
+      : elements;
+
+    const countWithoutMerge = filtered.filter(m => !m.mergePoint).length;
+
+    setFilteredCount(countWithoutMerge);
+
+    setSelectedLname(lname);
+
+    if (!cyInstance) return;
+
+    // Hide all nodes and edges initially
+    cyInstance.nodes().forEach(node => node.hide());
+    cyInstance.edges().forEach(edge => edge.hide());
+
+    if (!lname) {
+      // Show all nodes and edges if no surname is selected
+      cyInstance.nodes().forEach(node => node.show());
+      cyInstance.edges().forEach(edge => edge.show());
+      cyInstance.layout({ name: 'dagre' }).run();
+      return;
+    }
+
+    const matchingNodes = cyInstance.nodes().filter(n => n.data('lname') === lname);
+
+    if (matchingNodes.length === 0) return;
+
+    const findTopAncestor = (node) => {
+      let current = node;
+      while (current.incomers('edge').length > 0) {
+        current = current.incomers('edge')[0].source();
+        if (!current.data('lname') || current.data('lname') !== lname) {
+          break;
+        }
+      }
+      return current;
+    };
+
+    const topAncestors = matchingNodes.map(findTopAncestor);
+    const uniqueTopAncestors = [...new Set(topAncestors.map(n => n.id()))];
+
+    const showDescendants = (node) => {
+      node.show();
+      node.outgoers('edge').forEach(edge => {
+        edge.show();
+        const target = edge.target();
+        if (target.data('role') !== 'MergePoint') {
+          target.show();
+          showDescendants(target);
+        }
+      });
+    };
+
+    uniqueTopAncestors.forEach(id => {
+      const root = cyInstance.getElementById(id);
+      root.show();
+      showDescendants(root);
+
+      // Additionally, show spouses connected to MergePoints
+      const mergePointConnections = cyInstance.edges().filter(edge => {
+        const sourceNode = edge.source();
+        const targetNode = edge.target();
+        return (sourceNode.id() === id && sourceNode.data('role') === 'MergePoint') ||
+          (targetNode.id() === id && targetNode.data('role') === 'MergePoint');
+      });
+
+      mergePointConnections.forEach(edge => {
+        edge.show();
+        edge.source().show();
+        edge.target().show();
+      });
+    });
+
+    cyInstance.layout({ name: 'dagre' }).run();
+  };
+
+
   return (
-    <div style={{ height: '100vh', width: '100%' }}>
-      <div id="cy" style={{ height: '100%', width: '100%' }}></div>
+    <div style={{ height: '100vh', width: '100%', display: 'flex', flexDirection: 'column' }}>
+      {/* Header area with filter and count */}
+      <div
+        style={{
+          padding: '10px 20px',
+          backgroundColor: '#f9f9f9',
+          borderBottom: '1px solid #ddd',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
+        {/* Dropdown filter */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <label htmlFor="lname-select" style={{ fontWeight: 'bold' }}>ფილტრი:</label>
+          <select
+            id="lname-select"
+            value={selectedLname}
+            onChange={(e) => handleLnameFilter(e.target.value)}
+            style={{
+              padding: '6px 10px',
+              borderRadius: '4px',
+              border: '1px solid #ccc',
+              fontSize: '14px',
+            }}
+          >
+            <option value="">ყველა</option>
+            {allLnames.map(name => (
+              <option key={name} value={name}>{name}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Count display */}
+        <div style={{ fontSize: '15px', color: '#333' }}>
+          სულ: <strong style={{ color: '#007acc' }}>{filteredCount}</strong> ადამიანი
+        </div>
+      </div>
+
+      {/* Cytoscape container */}
+      <div id="cy" style={{ flexGrow: 1, width: '100%' }}></div>
     </div>
+
   );
 };
 
