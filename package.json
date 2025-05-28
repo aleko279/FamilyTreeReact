@@ -20,6 +20,7 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-scripts": "5.0.1",
+    "react-select": "^5.10.1",
     "sigma": "^3.0.1",
     "web-vitals": "^2.1.4"
   },
@@ -49,5 +50,5 @@
       "last 1 safari version"
     ]
   },
-   "proxy": "http://gisservices.ge:8080"
+  "proxy": "http://gisservices.ge:8080"
 }
