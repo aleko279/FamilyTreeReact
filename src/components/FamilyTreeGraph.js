@@ -9,6 +9,7 @@ import {
   layoutContainerStyle,
   headerStyle,
   graphContainerStyle,
+  graphPreviewContainerStyle
 } from '../styles/familyTreeStyles';
 const FamilyTreeGraph = () => {
   const [elements, setElements] = useState([]);
@@ -20,6 +21,15 @@ const FamilyTreeGraph = () => {
   const [allLnames, setAllLnames] = useState([]);
   const [filteredCount, setFilteredCount] = useState(0);
 
+  const [previewOpen, setPreviewOpen] = useState(true);
+
+  const togglePreview = () => setPreviewOpen(prev => !prev);
+
+  const previewStyle = {
+    ...graphPreviewContainerStyle,
+    width: previewOpen ? '600px' : '0px',
+  };
+
   useEffect(() => {
     fetchFamilyTree().then(data => {
       setElements(data.members);
@@ -30,7 +40,7 @@ const FamilyTreeGraph = () => {
     });
   }, []);
   useEffect(() => {
-    const count = elements.filter(m => m.role !='MergePoint').length;
+    const count = elements.filter(m => m.role != 'MergePoint').length;
     setFilteredCount(count);
   }, [elements]);
 
@@ -142,14 +152,32 @@ const FamilyTreeGraph = () => {
           onFilterChange={handleLnameFilter}
         />
         <SearchInputs
-          peopleList={allElements}
+          peopleList={allElements.filter(m => m.role != 'MergePoint')}
           setElements={setElements}
           setConnections={setConnections}
         />
         <CountDisplay count={filteredCount} />
       </div>
-      <div id="cy" style={graphContainerStyle}></div>
+      <div style={graphContainerStyle}>
+        <div id="cy" style={{ width: '100%', height: '100%' }}></div>
+        <div id="cy-preview" style={previewStyle}></div>
+        <button
+          onClick={togglePreview}
+          style={{
+            position: 'absolute',
+            right: previewOpen ? '600px' : '0px',
+            top: '10px',
+            zIndex: 10,
+            padding: '5px 10px',
+            cursor: 'pointer',
+            transition: 'right 0.3s ease',
+          }}
+        >
+          {previewOpen ? '⟨' : '⟩'}
+        </button>
+      </div>
     </div>
+
   );
 };
 

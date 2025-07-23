@@ -23,32 +23,6 @@ const SearchInputs = ({
     }
   }, [selectedPerson]);
 
-
-  // useEffect(() => {
-  //   if (!husbandSearch) {
-  //     setSelectedHusband(null);
-  //     setSelectedWife(null);
-  //     return;
-  //   }
-
-  //   const foundHusband = elements.find(m =>
-  //     (m.fname + ' ' + m.lname).toLowerCase().includes(husbandSearch.toLowerCase())
-  //   );
-
-  //   if (foundHusband) {
-  //     setSelectedHusband(foundHusband);
-  //     fetchSpouseData(foundHusband.id).then(({ wife, wifeName }) => {
-  //       setSelectedWife(wife);
-  //       setWifeSearch(wifeName);
-  //     });
-  //   } else {
-  //     setSelectedHusband(null);
-  //     setSelectedWife(null);
-  //   }
-  // }, [husbandSearch, elements]);
-
-
-
   const handleSearch = () => {
     if (!selectedPerson || !relatedSpouse) return;
     fetchOnlyFamilyTree(
