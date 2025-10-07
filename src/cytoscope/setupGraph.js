@@ -151,6 +151,7 @@ export const initializeCytoscape = (elements, connections) => {
 
   const findCommonAncestor = (path1, path2) => {
     const set1 = new Set(path1.map(edge => edge.source().id()));
+    const set2 = new Set(path2.map(edge => edge.source().id()));
     for (let edge of path2) {
       if (set1.has(edge.source().id())) return edge.source().id();
     }
@@ -201,15 +202,54 @@ export const initializeCytoscape = (elements, connections) => {
       const trimmed1 = trimToAncestor(path1, ancestor);
       const trimmed2 = trimToAncestor(path2, ancestor);
       [...trimmed1, ...trimmed2].forEach(edge => edge.addClass('selected'));
-    } else {
-      const direct = findDirectLineage(cy, id1, id2);
-      if (direct.length > 0) {
-        direct.forEach(edge => edge.addClass('selected'));
-      } else {
-        const reverse = findDirectLineage(cy, id2, id1);
-        reverse.forEach(edge => edge.addClass('selected'));
+      // } else {
+      //   const direct = findDirectLineage(cy, id1, id2);
+      //   if (direct.length > 0) {
+      //     direct.forEach(edge => edge.addClass('selected'));
+      //   } else {
+      //     const reverse = findDirectLineage(cy, id2, id1);
+      //     reverse.forEach(edge => edge.addClass('selected'));
+    }
+    else {
+      const kinship = findKinshipPath(cy, id1, id2);
+      if (kinship.length > 0) {
+        kinship.forEach(edge => edge.addClass('selected'));
       }
     }
+
+  };
+  // ორ ნოდს შორის ნათესაური კავშირის პოვნა — ორმხრივი ძიებით
+  const findKinshipPath = (cy, fromId, toId) => {
+    const visited = new Set();
+    const queue = [[fromId, []]];
+
+    while (queue.length > 0) {
+      const [currentId, path] = queue.shift();
+      if (currentId === toId) return path;
+
+      if (visited.has(currentId)) continue;
+      visited.add(currentId);
+
+      const node = cy.getElementById(currentId);
+      // მოძრაობა ორივე მიმართულებით: მშობელი → შვილი და შვილი → მშობელი
+      const neighbors = [
+        ...node.outgoers('edge'),
+        ...node.incomers('edge'),
+      ];
+
+      for (let edge of neighbors) {
+        const nextId =
+          edge.source().id() === currentId
+            ? edge.target().id()
+            : edge.source().id();
+
+        if (!visited.has(nextId)) {
+          queue.push([nextId, [...path, edge]]);
+        }
+      }
+    }
+
+    return [];
   };
 
   cy.on('tap', 'node', (event) => {
