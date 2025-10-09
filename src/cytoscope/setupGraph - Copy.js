@@ -144,57 +144,34 @@ export const initializeCytoscape = (elements, connections) => {
 
   // === Path Selection Logic ===
   let selectedNodes = [];
-const findPathToRoot = (cy, nodeId) => {
-  const path = [];
-  const visited = new Set();
-  const stack = [cy.getElementById(nodeId)];
 
-  while (stack.length > 0) {
-    const current = stack.pop();
-    if (!current || current.empty()) continue;
-    if (visited.has(current.id())) continue;
-    visited.add(current.id());
+  const findPathToRoot = (cy, nodeId) => {
+    const path = [];
+    const visited = new Set();
+    const stack = [cy.getElementById(nodeId)];
 
-    // მხოლოდ ზემოთ მდებარე კავშირები (მშობელი → ბავშვი)
-    const edges = [...current.incomers('edge')];
-    for (let e of edges) {
-      const parent = e.source(); // სორსი ყოველთვის მშობელია
-      if (!visited.has(parent.id())) {
-        path.push(e);
-        stack.push(parent);
+    while (stack.length > 0) {
+      const current = stack.pop();
+      if (!current || current.empty()) continue;
+      if (visited.has(current.id())) continue;
+      visited.add(current.id());
+
+      // მოძებნე ყველა შესასვლელი და გამოსასვლელი კავშირი
+      const edges = [...current.incomers('edge'), ...current.outgoers('edge')];
+      for (let e of edges) {
+        const source = e.source();
+        const target = e.target();
+
+        // ვინ არის "მშობელი" — ზოგჯერ შეიძლება იყოს ან source ან target
+        const parent = source.id() === current.id() ? target : source;
+        if (!visited.has(parent.id())) {
+          path.push(e);
+          stack.push(parent);
+        }
       }
     }
-  }
-  return path;
-};
-
-  // const findPathToRoot = (cy, nodeId) => {
-  //   const path = [];
-  //   const visited = new Set();
-  //   const stack = [cy.getElementById(nodeId)];
-
-  //   while (stack.length > 0) {
-  //     const current = stack.pop();
-  //     if (!current || current.empty()) continue;
-  //     if (visited.has(current.id())) continue;
-  //     visited.add(current.id());
-
-  //     // მოძებნე ყველა შესასვლელი და გამოსასვლელი კავშირი
-  //     const edges = [...current.incomers('edge'), ...current.outgoers('edge')];
-  //     for (let e of edges) {
-  //       const source = e.source();
-  //       const target = e.target();
-
-  //       // ვინ არის "მშობელი" — ზოგჯერ შეიძლება იყოს ან source ან target
-  //       const parent = source.id() === current.id() ? target : source;
-  //       if (!visited.has(parent.id())) {
-  //         path.push(e);
-  //         stack.push(parent);
-  //       }
-  //     }
-  //   }
-  //   return path;
-  // };
+    return path;
+  };
 
   const colorizePath = (path) => {
     path.forEach(edge => {
@@ -221,6 +198,31 @@ const findPathToRoot = (cy, nodeId) => {
     return trimmed;
   };
 
+  const findDirectLineage = (cy, fromId, toId) => {
+    const visited = new Set();
+    const path = [];
+
+    const dfs = (currentId) => {
+      if (currentId === toId) return true;
+      visited.add(currentId);
+
+      const outEdges = cy.getElementById(currentId).outgoers('edge');
+
+      for (let edge of outEdges) {
+        const nextId = edge.target().id();
+        if (!visited.has(nextId)) {
+          path.push(edge);
+          if (dfs(nextId)) return true;
+          path.pop();
+        }
+      }
+
+      return false;
+    };
+
+    if (dfs(fromId)) return [...path];
+    return [];
+  };
   // აბრუნებს ერთი საფეხურით ზემოთ არსებულ მშობელ(ებ)ს
   const findParents = (cy, nodeId) => {
     const node = cy.getElementById(nodeId);
