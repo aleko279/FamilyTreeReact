@@ -131,6 +131,15 @@ export const initializeCytoscape = (elements, connections) => {
         },
       })),
     ],
+    // === 👇 ზუმის და პანინგის კონტროლი ===
+    zoomingEnabled: true,
+    userZoomingEnabled: true,
+    wheelSensitivity: 0.3,   // პატარა მნიშვნელობა → უფრო ნაზი ზუმი
+    minZoom: 0.1,
+    maxZoom: 3,
+    panningEnabled: true,
+    userPanningEnabled: true,
+    autoungrabify: false,
   });
 
   // === Path Selection Logic ===
@@ -138,20 +147,43 @@ export const initializeCytoscape = (elements, connections) => {
 
   const findPathToRoot = (cy, nodeId) => {
     const path = [];
-    let current = cy.getElementById(nodeId);
+    const visited = new Set();
+    const stack = [cy.getElementById(nodeId)];
 
-    while (current.incomers('edge').length > 0) {
-      const incoming = current.incomers('edge')[0];
-      path.push(incoming);
-      current = incoming.source();
+    while (stack.length > 0) {
+      const current = stack.pop();
+      if (!current || current.empty()) continue;
+      if (visited.has(current.id())) continue;
+      visited.add(current.id());
+
+      // მოძებნე ყველა შესასვლელი და გამოსასვლელი კავშირი
+      const edges = [...current.incomers('edge'), ...current.outgoers('edge')];
+      for (let e of edges) {
+        const source = e.source();
+        const target = e.target();
+
+        // ვინ არის "მშობელი" — ზოგჯერ შეიძლება იყოს ან source ან target
+        const parent = source.id() === current.id() ? target : source;
+        if (!visited.has(parent.id())) {
+          path.push(e);
+          stack.push(parent);
+        }
+      }
     }
-
     return path;
   };
 
+  const colorizePath = (path) => {
+    path.forEach(edge => {
+      let gender = edge.source().data('gender');
+      if (!gender) gender = edge.target().data('gender'); // fallback
+      if (gender === 'ქალი') edge.addClass('maternal');
+      else if (gender === 'კაცი') edge.addClass('paternal');
+      else edge.addClass('selected');
+    });
+  };
   const findCommonAncestor = (path1, path2) => {
     const set1 = new Set(path1.map(edge => edge.source().id()));
-    const set2 = new Set(path2.map(edge => edge.source().id()));
     for (let edge of path2) {
       if (set1.has(edge.source().id())) return edge.source().id();
     }
@@ -192,65 +224,196 @@ export const initializeCytoscape = (elements, connections) => {
     if (dfs(fromId)) return [...path];
     return [];
   };
+  // აბრუნებს ერთი საფეხურით ზემოთ არსებულ მშობელ(ებ)ს
+  const findParents = (cy, nodeId) => {
+    const node = cy.getElementById(nodeId);
+    if (!node || node.empty()) return [];
+    return node.incomers('edge').map(e => e.source().id());
+  };
 
   const highlightDirectLineage = (cy, id1, id2) => {
+    cy.edges().removeClass('selected maternal paternal');
+    cy.nodes().removeClass('selected');
+
     const path1 = findPathToRoot(cy, id1);
     const path2 = findPathToRoot(cy, id2);
+
     const ancestor = findCommonAncestor(path1, path2);
 
     if (ancestor) {
       const trimmed1 = trimToAncestor(path1, ancestor);
       const trimmed2 = trimToAncestor(path2, ancestor);
-      [...trimmed1, ...trimmed2].forEach(edge => edge.addClass('selected'));
-      // } else {
-      //   const direct = findDirectLineage(cy, id1, id2);
-      //   if (direct.length > 0) {
-      //     direct.forEach(edge => edge.addClass('selected'));
-      //   } else {
-      //     const reverse = findDirectLineage(cy, id2, id1);
-      //     reverse.forEach(edge => edge.addClass('selected'));
-    }
-    else {
-      const kinship = findKinshipPath(cy, id1, id2);
-      if (kinship.length > 0) {
-        kinship.forEach(edge => edge.addClass('selected'));
-      }
-    }
 
+      colorizePath(trimmed1);
+      colorizePath(trimmed2);
+
+      cy.getElementById(id1).addClass('selected');
+      cy.getElementById(id2).addClass('selected');
+      cy.getElementById(ancestor).addClass('selected');
+
+      // მონიშნე მხოლოდ ერთი საფეხურით ზემოთ (ბაბუა/ბებია)
+      const parents = findParents(cy, ancestor);
+      parents.forEach(pId => {
+        const parentNode = cy.getElementById(pId);
+        parentNode.addClass('selected');
+
+        const connectingEdge = parentNode.outgoers('edge').filter(e => e.target().id() === ancestor);
+        colorizePath(connectingEdge);
+      });
+
+    } else {
+      const kinship = findKinshipPath(cy, id1, id2);
+      if (kinship.length > 0) kinship.forEach(edge => edge.addClass('selected'));
+    }
   };
-  // ორ ნოდს შორის ნათესაური კავშირის პოვნა — ორმხრივი ძიებით
-  const findKinshipPath = (cy, fromId, toId) => {
+
+
+  // const highlightDirectLineage = (cy, id1, id2) => {
+  //   const path1 = findPathToRoot(cy, id1);
+  //   const path2 = findPathToRoot(cy, id2);
+  //   const ancestor = findCommonAncestor(path1, path2);
+
+  //   cy.edges().removeClass('selected');
+  //   cy.nodes().removeClass('selected');
+  //   const grandparents2 = findParents(cy, ancestor);
+  //   if (ancestor) {
+  //     const trimmed1 = trimToAncestor(path1, ancestor);
+  //     const trimmed2 = trimToAncestor(path2, ancestor);
+  //     [...trimmed1, ...trimmed2].forEach(edge => edge.addClass('selected'));
+
+  //     // 🔹 ancestor-ის ზემოთ ერთი საფეხურით ამოსვლა — ბაბუა/ბებია
+  //     const grandparents = findParents(cy, ancestor);
+  //     grandparents.forEach(gpId => {
+  //       const gpNode = cy.getElementById(gpId);
+  //       gpNode.addClass('selected'); // გამოაჩინე graph-ზე
+  //       // ასევე მოინიშნოს ხაზები ბაბუიდან ancestor-მდე
+  //       const gpEdges = gpNode.outgoers('edge').filter(e => e.target().id() === ancestor);
+  //       gpEdges.forEach(e => e.addClass('selected'));
+  //     });
+
+  //     console.log(`Common ancestor: ${ancestor}`);
+  //     console.log(`Grandparents: ${grandparents.join(', ')}`);
+  //   }
+  //   else {
+  //     // fallback — თუ საერთო ancestor ვერ იპოვა
+  //     const kinship = findKinshipPath(cy, id1, id2);
+  //     if (kinship.length > 0) {
+  //       kinship.forEach(edge => edge.addClass('selected'));
+  //     }
+  //   }
+  // };
+
+  // ორ ნოდს შორის ნათესაური კავშირის პოვნა — ორმხრივი ძიებით (BFS)
+  // დააკალ გაშვება: findKinshipPath(cy, fromId, toId, { debug: true })
+  const findKinshipPath = (cy, fromId, toId, { debug = true } = {}) => {
+    const normalize = (v) => (v || '').toString().toLowerCase();
+
     const visited = new Set();
-    const queue = [[fromId, []]];
+    const queue = [[fromId, []]]; // path is array of edge objects
+
+    if (debug) {
+      console.log(`[findKinshipPath] start from=${fromId} to=${toId}`);
+    }
 
     while (queue.length > 0) {
       const [currentId, path] = queue.shift();
-      if (currentId === toId) return path;
+
+      if (currentId === toId) {
+        if (debug) console.log('[findKinshipPath] found path (constrained):', path.map(e => e.id()));
+        return path;
+      }
 
       if (visited.has(currentId)) continue;
       visited.add(currentId);
 
       const node = cy.getElementById(currentId);
-      // მოძრაობა ორივე მიმართულებით: მშობელი → შვილი და შვილი → მშობელი
-      const neighbors = [
+      if (!node || node.empty()) {
+        if (debug) console.log('[findKinshipPath] missing node', currentId);
+        continue;
+      }
+
+      const role = normalize(node.data('role'));
+
+      // მოიპოვე ყველა იმ edge-სი, რომელიც დაკავშირებულია ამ ნოდთან (both directions)
+      const neighborEdges = [
         ...node.outgoers('edge'),
         ...node.incomers('edge'),
       ];
 
-      for (let edge of neighbors) {
-        const nextId =
-          edge.source().id() === currentId
-            ? edge.target().id()
-            : edge.source().id();
+      for (let edge of neighborEdges) {
+        const nextNode = edge.source().id() === currentId ? edge.target() : edge.source();
+        if (!nextNode || nextNode.empty()) continue;
+
+        const nextId = nextNode.id();
+        const nextRole = normalize(nextNode.data('role'));
+
+        // 1) MergePoint -> MergePoint არ გვინდა
+        if (role === 'mergepoint' && nextRole === 'mergepoint') {
+          if (debug) console.log(`[skip] mergepoint->mergepoint ${currentId} -> ${nextId}`);
+          continue;
+        }
+
+        // 2) თუ ახლა MergePoint-ზე ვართ, მხოლოდ Child-ს მივყვეთ
+        if (role === 'mergepoint' && nextRole !== 'child') {
+          if (debug) console.log(`[skip] mergepoint can only go to child ${currentId} -> ${nextId} (nextRole=${nextRole})`);
+          continue;
+        }
+
+        // 3) თუ შემდეგი არის MergePoint (მშობლიდან გადადიხარ MergePoint-ზე),
+        //    დავრწმუნდეთ რომ იმას შეეძლება ბავშვზე გასვლა (აქვს outgoing edge to Child)
+        if (nextRole === 'mergepoint') {
+          const outEdges = nextNode.outgoers('edge');
+          let hasChild = false;
+          for (let oe of outEdges) {
+            const targ = oe.target();
+            if (normalize(targ.data('role')) === 'child') {
+              hasChild = true;
+              break;
+            }
+          }
+          if (!hasChild) {
+            if (debug) console.log(`[skip] target mergepoint has no child ${nextId}`);
+            continue;
+          }
+        }
 
         if (!visited.has(nextId)) {
           queue.push([nextId, [...path, edge]]);
         }
+      } // end for edges
+    } // end while
+
+    // თუ constrained ძიება არ მოიტანა შედეგი, ჩავრთავთ relaxed (debug only)
+    if (debug) {
+      console.log('[findKinshipPath] constrained search failed — trying relaxed search (no role constraints) for diagnostics');
+      const visited2 = new Set();
+      const q2 = [[fromId, []]];
+      while (q2.length > 0) {
+        const [curId, p] = q2.shift();
+        if (curId === toId) {
+          console.log('[findKinshipPath] found path (relaxed):', p.map(e => e.id()));
+          return p;
+        }
+        if (visited2.has(curId)) continue;
+        visited2.add(curId);
+
+        const curNode = cy.getElementById(curId);
+        if (!curNode || curNode.empty()) continue;
+        const neigh = [...curNode.outgoers('edge'), ...curNode.incomers('edge')];
+        for (let e of neigh) {
+          const nxt = e.source().id() === curId ? e.target() : e.source();
+          if (!visited2.has(nxt.id())) q2.push([nxt.id(), [...p, e]]);
+        }
       }
+      console.log('[findKinshipPath] relaxed search also found nothing');
     }
 
     return [];
   };
+
+
+
+
 
   cy.on('tap', 'node', (event) => {
     const node = event.target;
@@ -273,6 +436,15 @@ export const initializeCytoscape = (elements, connections) => {
       renderPreviewFromSelection(cy); // ამოიღებს preview-ს
     }
   });
+  // === DEBUG: შეამოწმე mergePoint 57-ს რა შვილები ჰყავს ===
+  console.log(
+    '57 out edges:',
+    cy.getElementById('57').outgoers('edge').map(e => ({
+      id: e.id(),
+      target: e.target().id(),
+      targetRole: e.target().data('role')
+    }))
+  );
 
   return cy;
 };

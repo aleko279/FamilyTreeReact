@@ -65,6 +65,22 @@ export const defaultCYStyle = [
     },
   },
   {
+    selector: 'edge.maternal',
+    style: {
+      'line-color': '#e74c3c', // წითელი
+      'target-arrow-color': '#e74c3c',
+      'width': 3
+    }
+  },
+  {
+    selector: 'edge.paternal',
+    style: {
+      'line-color': '#3498db', // ლურჯი
+      'target-arrow-color': '#3498db',
+      'width': 3
+    }
+  },
+  {
     selector: 'node.selected',
     style: {
       'border-color': '#FFD700',

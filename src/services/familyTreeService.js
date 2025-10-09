@@ -1,5 +1,6 @@
 export const fetchFamilyTree = () =>
-  fetch('https://aleko279.runasp.net/api/FamilyTree/GetFamilyTree')
+  // fetch('https://aleko279.runasp.net/api/FamilyTree/GetFamilyTree')
+fetch('https://localhost:7261/api/FamilyTree/GetFamilyTree')
     .then(res => res.json());
 
 export const fetchSpouseData = async (husbandId) => {
@@ -25,5 +26,6 @@ export const fetchSpouseData = async (husbandId) => {
 };
 
 export const fetchOnlyFamilyTree = (spouseId1, spouseId2) =>
-  fetch(`https://aleko279.runasp.net/api/FamilyTree/GetOnlyFamilyTree?spouseId1=${spouseId1}&spouseId2=${spouseId2}`)
+  // fetch(`https://aleko279.runasp.net/api/FamilyTree/GetOnlyFamilyTree?spouseId1=${spouseId1}&spouseId2=${spouseId2}`)
+  fetch(`https://localhost:7261/api/FamilyTree/GetOnlyFamilyTree?spouseId1=${spouseId1}&spouseId2=${spouseId2}`)
     .then(res => res.json());
