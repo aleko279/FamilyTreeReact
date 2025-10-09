@@ -488,16 +488,25 @@ export const renderPreviewFromSelection = (cy) => {
       classes: node.classes().join(' '),
     });
   });
-
-  selectedEdges.forEach(edge => {
-    elements.push({
-      data: {
-        id: edge.id(),
-        source: edge.source().id(),
-        target: edge.target().id(),
-      },
-    });
+selectedEdges.forEach(edge => {
+  elements.push({
+    data: {
+      id: edge.id(),
+      source: edge.source().id(),
+      target: edge.target().id(),
+    },
+    classes: edge.classes().join(' ')  // <-- edges-საც გაწერე class-ები
   });
+});
+  // selectedEdges.forEach(edge => {
+  //   elements.push({
+  //     data: {
+  //       id: edge.id(),
+  //       source: edge.source().id(),
+  //       target: edge.target().id(),
+  //     },
+  //   });
+  // });
 
   // preview გრაფის შექმნა
   cytoscape({
