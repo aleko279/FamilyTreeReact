@@ -189,7 +189,6 @@ export const initializeCytoscape = (elements, connections) => {
     }
     return null;
   };
-
   const trimToAncestor = (path, ancestorId) => {
     const trimmed = [];
     for (let edge of path) {
